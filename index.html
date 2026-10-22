@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gold Desk UAE</title>
+<style>
+:root{--bg:#f2f4f1;--card:#fbfcfa;--tx:#17231f;--mu:#62706b;--bd:#d5dcd7;--ac:#9a7414;--g:#1f7a4d;--r:#b0392f;--y:#a8700f}
+@media(prefers-color-scheme:dark){:root{--bg:#0f1614;--card:#16201d;--tx:#e7eeea;--mu:#93a29b;--bd:#2a3833;--ac:#d9ae3f;--g:#4fc08a;--r:#f07d70;--y:#e0b04a}}
+*{box-sizing:border-box}
+body{margin:0 auto;max-width:1040px;padding:14px;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+h1{font:700 22px Georgia,serif;margin:0}
+h2{font-size:14px;font-weight:600;color:var(--mu);margin:0 0 8px}
+.top{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;margin-top:12px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px}
+.wide{grid-column:1/-1}
+.big{font:700 30px Georgia,serif}
+.mu{color:var(--mu);font-size:13px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid var(--bd);font-size:14px}
+.bar{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--g),var(--y),var(--r));position:relative;margin:14px 0 4px}
+.bar i{position:absolute;top:-5px;width:4px;height:18px;background:var(--tx);border-radius:2px}
+.v{font:700 17px Georgia,serif}
+input{width:100%;padding:7px;border:1px solid var(--bd);border-radius:6px;background:var(--bg);color:var(--tx);font:inherit}
+label{font-size:12px;color:var(--mu)}
+.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;margin-bottom:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td,th{padding:5px 4px;text-align:right;border-bottom:1px solid var(--bd);font-weight:400}
+th{color:var(--mu)}td:first-child,th:first-child{text-align:left}
+button{padding:7px 14px;border:0;border-radius:6px;background:var(--ac);color:#fff;font:600 14px system-ui;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+.x{background:none;color:var(--r);padding:0 4px}
+svg{width:100%;height:auto;display:block}
+</style></head><body>
+<main id="app"></main>
+<script>
+const DATA_URL='data.json',AED=3.6725,OZ=31.1035;
+const $=id=>document.getElementById(id);
+let S=JSON.parse(localStorage.gt||'{}'),D=null,live=null;
+const save=()=>localStorage.gt=JSON.stringify(S);
+const px=a=>a.map(x=>x[1]);
+const sma=(a,n)=>{const s=a.slice(-n);return s.reduce((t,x)=>t+x,0)/s.length};
+const chg=(a,n)=>a[a.length-1]/a[a.length-1-n]-1;
+const clamp=x=>Math.max(0,Math.min(100,x));
+const map=(x,lo,hi)=>clamp((x-lo)/(hi-lo)*100);
+const f=(x,d=2)=>x==null||isNaN(x)?'–':x.toLocaleString('en',{minimumFractionDigits:d,maximumFractionDigits:d});
+const pc=x=>(x>=0?'+':'')+f(x*100,1)+'%';
+function rsi(a,n=14){let g=0,l=0;for(let i=a.length-n;i<a.length;i++){const d=a[i]-a[i-1];d>0?g+=d:l-=d}return l?100-100/(1+g/l):100}
+
+async function load(){
+  try{D=await (await fetch(DATA_URL+'?t='+Date.now())).json();localStorage.gtD=JSON.stringify(D)}catch(e){}
+  try{live=(await (await fetch('https://api.gold-api.com/price/XAU')).json()).price}catch(e){}
+  render();
+}
+function pick(e){const r=new FileReader();r.onload=()=>{D=JSON.parse(r.result);localStorage.gtD=JSON.stringify(D);render()};r.readAsText(e.target.files[0])}
+function setv(k,v){S[k]=+v;save();render()}
+function add(){const g=+$('lg').value,b=+$('lb').value;if(!g||!b)return;(S.L=S.L||[]).push({d:$('ld').value||new Date().toISOString().slice(0,10),g,b});save();render()}
+function del(i){S.L.splice(i,1);save();render()}
+
+function render(){
+  D=D||JSON.parse(localStorage.gtD||'null');
+  if(!D){$('app').innerHTML='<h1>Gold Desk UAE</h1><div class="card" style="margin-top:12px">No market data yet. Run the GitHub Action once so it creates data.json, or load a copy here: <input type="file" accept=".json" onchange="pick(event)"></div>';return}
+  const T=D.series,g=px(T.gold),p=g[g.length-1],spot=live||p,sg=spot/OZ*AED;
+  const w=g.slice(-252),hi=Math.max(...w),lo=Math.min(...w),m50=sma(g,50),m200=sma(g,200),dd=p/hi-1;
+  // sentiment: 0 = fear (oversold), 100 = greed (stretched)
+  const comp=[['RSI (14-day)',rsi(g)],['Price vs 50-day average',map(p/m50-1,-.06,.06)],['1-month move',map(chg(g,21),-.1,.1)],['Position in 52-week range',map(p,lo,hi)]];
+  const sc=comp.reduce((t,x)=>t+x[1],0)/comp.length;
+  // macro drivers: bias +1 supports gold, -1 headwind
+  let ms=0;
+  const drv=[['US dollar (DXY)','dxy',-1],['US 10Y yield','tnx',-1],['VIX (market fear)','vix',1],['Silver vs gold, 1 month','silver',1],['S&P 500','spx',0]].map(([n,k,s])=>{
+    const a=px(T[k]),c=chg(a,20);let b=s*Math.sign(c);if(k==='silver')b=Math.sign(c-chg(g,20));ms+=b;
+    const col=b>0?'--g':b<0?'--r':'--mu';
+    return `<div class="row"><span>${n}</span><span>${f(a[a.length-1])} (${pc(c)}) <b style="color:var(${col})">${b>0?'supports gold':b<0?'headwind':'neutral'}</b></span></div>`}).join('');
+  const mac=50+12.5*ms;
+  // costs
+  const bp=S.bp??1,sd=S.sd??.5,be=(1+bp/100)/(1-sd/100)-1;
+  const hr=[[21,'1 month'],[63,'3 months'],[252,'1 year']].map(([n,l])=>{let a=0,t=0;for(let i=0;i+n<g.length;i++){t++;if(g[i+n]/g[i]-1>be)a++}return `<div class="row"><span>Held ${l}</span><b>${t?f(a/t*100,0):'–'}% of past windows beat break-even</b></div>`}).join('');
+  // verdicts
+  const lt=dd<=-.1||p<m200*.97?['Accumulate: larger tranche','--g']:p>m200*1.12?['Stretched: small tranche only','--r']:['Regular tranche (steady buying)','--y'];
+  const fl=sc<=35&&mac>=50?['Flip buy zone','--g']:sc>=70||mac<=25?['Flip sell zone / do not buy','--r']:['Wait: no clear edge','--y'];
+  // retail table
+  const pur={'24K':1,'22K':22/24,'21K':21/24,'18K':18/24,'14K':14/24};
+  const rt=D.retail?Object.entries(D.retail).map(([k,v])=>`<tr><td>${k}</td><td>${f(v)}</td><td>${f(sg*pur[k])}</td><td>${pc(v/(sg*pur[k])-1)}</td></tr>`).join(''):'<tr><td colspan="4">Retail rates unavailable</td></tr>';
+  // chart
+  const n=Math.min(252,g.length),s=g.slice(-n),cl=Math.min(...s),ch=Math.max(...s);
+  const X=i=>i/(n-1)*600,Y=v=>140-(v-cl)/(ch-cl)*130;
+  const ma=k=>s.map((_,i)=>sma(g.slice(0,g.length-n+i+1),k));
+  const ln=(a,c,wd)=>`<polyline fill="none" stroke="${c}" stroke-width="${wd}" points="${a.map((v,i)=>X(i).toFixed(1)+','+Y(v).toFixed(1)).join(' ')}"/>`;
+  // log
+  const sell=sg*(1-sd/100),L=S.L||[];let tp=0;
+  const lr=L.map((x,i)=>{const pl=(sell-x.b)*x.g;tp+=pl;return `<tr><td>${x.d}</td><td>${f(x.g)}</td><td>${f(x.b)}</td><td style="color:var(${pl>=0?'--g':'--r'})">${f(pl,0)}</td><td><button class="x" onclick="del(${i})" aria-label="Delete">✕</button></td></tr>`}).join('');
+  $('app').innerHTML=`
+  <div class="top"><div><h1>Gold Desk UAE</h1><span class="mu">Data updated ${D.updated?D.updated.slice(0,16).replace('T',' ')+' UTC':'–'}${live?'':' · live price unavailable, using last close'}</span></div>
+  <div style="text-align:right"><div class="big">AED ${f(sg)}<span class="mu"> /g 24K</span></div><span class="mu">Spot $${f(spot)}/oz</span></div></div>
+  <div class="grid">
+   <div class="card"><h2>Signals</h2>
+    <div class="mu">Long-term holding</div><div class="v" style="color:var(${lt[1]})">${lt[0]}</div>
+    <div class="mu" style="margin-bottom:8px">${f(dd*100,1)}% from 52-week high · ${pc(p/m200-1)} vs 200-day average</div>
+    <div class="mu">Short-term flipping</div><div class="v" style="color:var(${fl[1]})">${fl[0]}</div>
+    <div class="mu">Sentiment ${f(sc,0)}/100 · macro support ${f(mac,0)}/100</div></div>
+   <div class="card"><h2>Gold sentiment (0 fear, 100 greed)</h2>
+    <div class="bar"><i style="left:calc(${sc}% - 2px)"></i></div>
+    ${comp.map(c=>`<div class="row"><span>${c[0]}</span><b>${f(c[1],0)}</b></div>`).join('')}</div>
+   <div class="card"><h2>Market drivers (1-month change)</h2>${drv}</div>
+   <div class="card"><h2>Dubai retail jewellery rate vs spot (AED/g)</h2>
+    <table><tr><th>Karat</th><th>Retail</th><th>Spot value</th><th>Premium</th></tr>${rt}</table>
+    <div class="mu" style="margin-top:6px">Retail is the Dubai Jewellery Group suggested price. Bars and coins usually carry a much smaller premium.</div></div>
+   <div class="card wide"><h2>Gold, 1 year (futures close) with 50-day and 200-day averages</h2>
+    <svg viewBox="0 0 600 150" role="img" aria-label="Gold price chart">${ln(s,'var(--tx)',1.6)}${ln(ma(50),'var(--ac)',1.2)}${ln(ma(200),'var(--g)',1.2)}</svg>
+    <span class="mu">Black: price · Gold: 50-day · Green: 200-day</span></div>
+   <div class="card"><h2>Flip calculator</h2>
+    <div class="f"><div><label>Buy premium over spot %</label><input type="number" step=".1" value="${bp}" onchange="setv('bp',this.value)"></div>
+    <div><label>Dealer buy-back discount %</label><input type="number" step=".1" value="${sd}" onchange="setv('sd',this.value)"></div></div>
+    <div class="row"><span>Break-even price rise</span><b>${f(be*100,2)}%</b></div>
+    <div class="row"><span>Spot needed (AED/g)</span><b>${f(sg*(1+be))}</b></div>${hr}
+    <div class="mu" style="margin-top:6px">Set both percentages from your dealer's real buy and sell quotes. The defaults are placeholders.</div></div>
+   <div class="card"><h2>My gold (valued at spot minus buy-back discount)</h2>
+    <div class="f"><div><label>Date</label><input id="ld" type="date"></div><div><label>Grams</label><input id="lg" type="number" step=".01"></div><div><label>Paid AED/g</label><input id="lb" type="number" step=".01"></div></div>
+    <button onclick="add()">Add purchase</button>
+    <table><tr><th>Date</th><th>Grams</th><th>Paid/g</th><th>P/L AED</th><th></th></tr>${lr||'<tr><td colspan="5">No purchases yet</td></tr>'}</table>
+    <div class="row"><span>Total P/L</span><b style="color:var(${tp>=0?'--g':'--r'})">AED ${f(tp,0)}</b></div></div>
+  </div>
+  <p class="mu">Educational tool, not financial advice. History uses gold futures; the live price is spot from gold-api.com (AED pegged at 3.6725). Signals describe conditions and do not predict prices.</p>`;
+}
+load();
+</script></body></html>
